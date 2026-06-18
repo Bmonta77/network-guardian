@@ -1,65 +1,92 @@
-import Image from "next/image";
+import { redirect } from "next/navigation";
+import { signIn } from "@/app/auth/actions";
+import { Logo } from "@/components/logo";
+import { getCurrentContext } from "@/lib/data";
 
-export default function Home() {
+export default async function LandingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const context = await getCurrentContext();
+  if (context && !context.demo) redirect("/dashboard");
+  const { error } = await searchParams;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <main className="grid min-h-screen bg-slate-950 lg:grid-cols-2">
+      <section className="flex flex-col justify-between bg-blue-950 p-8 text-white sm:p-12 lg:p-16">
+        <Logo />
+        <div className="my-16 max-w-xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-300">
+            Multi-site network operations
+          </p>
+          <h1 className="mt-5 text-4xl font-bold tracking-tight sm:text-6xl">
+            Monitor every private network from one secure dashboard.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="mt-6 text-lg leading-8 text-blue-100/80">
+            Network Guardian connects cloud visibility with local scanning
+            agents, role-based access, incident history, and controlled change
+            approvals.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <p className="text-sm text-blue-200/60">
+          Private IP scanning always happens inside the target network.
+        </p>
+      </section>
+      <section className="flex items-center justify-center bg-slate-50 p-6">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-900/5 sm:p-9">
+          <p className="text-sm font-semibold text-blue-700">Welcome back</p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
+            Sign in
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Admins, scanner operators, and viewers use organization-managed
+            accounts.
+          </p>
+          <form action={signIn} className="mt-7 space-y-4">
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-700">Email</span>
+              <input
+                className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                name="email"
+                required
+                type="email"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-semibold text-slate-700">
+                Password
+              </span>
+              <input
+                className="mt-2 h-12 w-full rounded-xl border border-slate-300 px-4 outline-none focus:border-blue-600 focus:ring-4 focus:ring-blue-100"
+                minLength={8}
+                name="password"
+                required
+                type="password"
+              />
+            </label>
+            {error && (
+              <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                {error}
+              </p>
+            )}
+            <button
+              className="h-12 w-full rounded-xl bg-blue-700 font-semibold text-white hover:bg-blue-800"
+              type="submit"
+            >
+              Sign in
+            </button>
+          </form>
+          {context?.demo && (
+            <a
+              className="mt-4 block text-center text-sm font-semibold text-blue-700"
+              href="/dashboard"
+            >
+              Continue in demo mode
+            </a>
+          )}
         </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }

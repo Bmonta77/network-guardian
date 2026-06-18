@@ -1,0 +1,13 @@
+{
+  "name": "network-guardian-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node index.mjs",
+    "scan-once": "node index.mjs --once"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  }
+}

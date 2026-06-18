@@ -89,8 +89,13 @@ The agent:
 - Opens/resolves downtime incidents
 - Sends a heartbeat every scan cycle
 - Runs every 60 seconds by default
+- Polls every 5 seconds for Admin-triggered **Scan** requests
 
 Use `npm run scan-once` inside `agent/` for a single scan.
+
+If the database schema was installed before manual Scan support was added, run
+[`supabase/scan-now-migration.sql`](supabase/scan-now-migration.sql) once in the
+Supabase SQL editor.
 
 ## Permissions
 

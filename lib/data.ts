@@ -12,6 +12,7 @@ import type {
   Device,
   Incident,
   Network,
+  NetworkScanControl,
   OrganizationRole,
   ScannerAgent,
 } from "@/lib/types";
@@ -143,4 +144,46 @@ export async function getScannerAgents(): Promise<ScannerAgent[]> {
       : null,
     version: row.version ? String(row.version) : null,
   }));
+}
+
+export async function getNetworkScanControl(
+  networkId: string,
+): Promise<NetworkScanControl> {
+  if (!isSupabaseConfigured()) {
+    return {
+      agentCount: 1,
+      enabledRangeCount: 1,
+      scanRequestedAt: null,
+      scanStartedAt: null,
+      scanCompletedAt: null,
+      scanError: null,
+    };
+  }
+
+  const supabase = await createClient();
+  const [{ data: agents }, { count: enabledRangeCount }] = await Promise.all([
+    supabase
+      .from("scanner_agents")
+      .select(
+        "scan_requested_at, scan_started_at, scan_completed_at, scan_error",
+      )
+      .eq("network_id", networkId)
+      .is("revoked_at", null)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("vlans")
+      .select("id", { count: "exact", head: true })
+      .eq("network_id", networkId)
+      .eq("enabled", true),
+  ]);
+
+  const latest = agents?.[0];
+  return {
+    agentCount: agents?.length ?? 0,
+    enabledRangeCount: enabledRangeCount ?? 0,
+    scanRequestedAt: latest?.scan_requested_at ?? null,
+    scanStartedAt: latest?.scan_started_at ?? null,
+    scanCompletedAt: latest?.scan_completed_at ?? null,
+    scanError: latest?.scan_error ?? null,
+  };
 }

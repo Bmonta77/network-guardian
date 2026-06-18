@@ -53,3 +53,12 @@ export type ScannerAgent = {
   last_heartbeat_at: string | null;
   version: string | null;
 };
+
+export type NetworkScanControl = {
+  agentCount: number;
+  enabledRangeCount: number;
+  scanRequestedAt: string | null;
+  scanStartedAt: string | null;
+  scanCompletedAt: string | null;
+  scanError: string | null;
+};

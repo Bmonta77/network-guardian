@@ -23,6 +23,7 @@ if (typeof process.loadEnvFile === "function") {
 const execFileAsync = promisify(execFile);
 const version = "0.1.0";
 const intervalMs = Number(process.env.SCAN_INTERVAL_SECONDS ?? 60) * 1000;
+const commandPollMs = Number(process.env.COMMAND_POLL_SECONDS ?? 5) * 1000;
 const timeoutSeconds = Number(process.env.PING_TIMEOUT_SECONDS ?? 2);
 const concurrency = Number(process.env.SCAN_CONCURRENCY ?? 24);
 const required = [
@@ -116,14 +117,17 @@ async function mapWithConcurrency(items, worker) {
   await Promise.all(runners);
 }
 
-async function scan() {
+async function getConfig() {
   const { data: config, error: configError } = await supabase.rpc(
     "agent_get_config",
     { raw_token: token },
   );
   if (configError) throw configError;
+  return config;
+}
 
-  await supabase.rpc("agent_heartbeat", {
+async function heartbeat() {
+  const { error } = await supabase.rpc("agent_heartbeat", {
     raw_token: token,
     heartbeat: {
       hostname: os.hostname(),
@@ -131,12 +135,20 @@ async function scan() {
       metadata: { platform: process.platform, arch: process.arch },
     },
   });
+  if (error) throw error;
+}
 
+async function scan(config) {
+  if (!config.ranges?.length) {
+    throw new Error("No enabled private scan ranges are configured.");
+  }
+  const knownIps = new Set(config.known_ips ?? []);
   for (const range of config.ranges ?? []) {
     const addresses = expandPrivateCidr(range.cidr);
     console.log(`Scanning ${range.cidr} (${addresses.length} hosts)`);
     await mapWithConcurrency(addresses, async (ip) => {
       const result = await ping(ip);
+      if (result.status === "offline" && !knownIps.has(ip)) return;
       const { error } = await supabase.rpc("agent_report_scan", {
         raw_token: token,
         report: {
@@ -152,16 +164,77 @@ async function scan() {
   }
 }
 
-async function run() {
+let scanRunning = false;
+
+async function runScheduledScan() {
+  if (scanRunning) return;
+  scanRunning = true;
   try {
-    await scan();
+    const config = await getConfig();
+    await heartbeat();
+    await scan(config);
     console.log(`Scan completed at ${new Date().toISOString()}`);
   } catch (error) {
     console.error("Scan failed:", error);
+  } finally {
+    scanRunning = false;
   }
 }
 
-await run();
+async function checkForManualScan() {
+  if (scanRunning) return;
+
+  try {
+    const config = await getConfig();
+    const requestedAt = config.scan_requested_at;
+    const completedAt = config.scan_completed_at;
+    if (
+      !requestedAt ||
+      (completedAt && new Date(completedAt) >= new Date(requestedAt))
+    ) {
+      return;
+    }
+
+    const { data: claimed, error: claimError } = await supabase.rpc(
+      "agent_start_scan",
+      { raw_token: token, requested_at: requestedAt },
+    );
+    if (claimError) throw claimError;
+    if (!claimed) return;
+
+    scanRunning = true;
+    console.log(`Manual scan requested at ${requestedAt}`);
+    try {
+      await heartbeat();
+      await scan(config);
+      const { error } = await supabase.rpc("agent_complete_scan", {
+        raw_token: token,
+        requested_at: requestedAt,
+        error_message: null,
+      });
+      if (error) throw error;
+      console.log(`Manual scan completed at ${new Date().toISOString()}`);
+    } catch (error) {
+      await supabase.rpc("agent_complete_scan", {
+        raw_token: token,
+        requested_at: requestedAt,
+        error_message: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    } finally {
+      scanRunning = false;
+    }
+  } catch (error) {
+    console.error("Manual scan check failed:", error);
+  }
+}
+
+await runScheduledScan();
 if (!process.argv.includes("--once")) {
-  setInterval(run, intervalMs);
+  setInterval(() => void runScheduledScan(), intervalMs);
+  setInterval(() => void checkForManualScan(), commandPollMs);
+  setInterval(
+    () => void heartbeat().catch((error) => console.error("Heartbeat failed:", error)),
+    Math.min(intervalMs, 30_000),
+  );
 }

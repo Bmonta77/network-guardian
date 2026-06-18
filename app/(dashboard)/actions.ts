@@ -14,6 +14,12 @@ export type RegisterAgentState = {
   token?: string;
 };
 
+export type RequestScanState = {
+  status: "idle" | "error" | "success";
+  message: string;
+  requestedAt?: string;
+};
+
 export async function createNetwork(formData: FormData) {
   const context = await getCurrentContext();
   if (!context || context.role !== "admin") throw new Error("Not authorized.");
@@ -144,5 +150,50 @@ export async function registerScannerAgent(
     agentName,
     networkName: network.name,
     token: String(result.token),
+  };
+}
+
+export async function requestNetworkScan(
+  _previousState: RequestScanState,
+  formData: FormData,
+): Promise<RequestScanState> {
+  const context = await getCurrentContext();
+  if (!context || context.role !== "admin") {
+    return {
+      status: "error",
+      message: "Admin access is required to request a network scan.",
+    };
+  }
+  if (!isSupabaseConfigured()) {
+    return {
+      status: "error",
+      message: "Connect the application to Supabase before requesting scans.",
+    };
+  }
+
+  const networkId = String(formData.get("networkId") ?? "");
+  if (!networkId) {
+    return { status: "error", message: "A network ID is required." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("request_network_scan", {
+    target_network_id: networkId,
+  });
+
+  if (error) {
+    return {
+      status: "error",
+      message: error.message,
+    };
+  }
+
+  revalidatePath(`/networks/${networkId}`);
+  return {
+    status: "success",
+    message: `Scan queued for ${Number(data) || 1} local scanner agent${
+      Number(data) === 1 ? "" : "s"
+    }.`,
+    requestedAt: new Date().toISOString(),
   };
 }

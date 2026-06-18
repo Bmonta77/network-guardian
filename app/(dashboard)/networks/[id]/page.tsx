@@ -1,7 +1,13 @@
 import { notFound } from "next/navigation";
 import { DeviceGrid } from "@/components/device-grid";
 import { PageHeader } from "@/components/page-header";
-import { getDevices, getNetworks } from "@/lib/data";
+import { ScanNetwork } from "@/components/scan-network";
+import {
+  getCurrentContext,
+  getDevices,
+  getNetworkScanControl,
+  getNetworks,
+} from "@/lib/data";
 
 export default async function NetworkDetailPage({
   params,
@@ -9,7 +15,12 @@ export default async function NetworkDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [networks, devices] = await Promise.all([getNetworks(), getDevices()]);
+  const [context, networks, devices, scanControl] = await Promise.all([
+    getCurrentContext(),
+    getNetworks(),
+    getDevices(),
+    getNetworkScanControl(id),
+  ]);
   const network = networks.find((item) => item.id === id);
   if (!network) notFound();
   const networkDevices = devices.filter((device) => device.network_id === id);
@@ -17,6 +28,11 @@ export default async function NetworkDetailPage({
   return (
     <>
       <PageHeader
+        action={
+          context?.role === "admin" ? (
+            <ScanNetwork control={scanControl} networkId={id} />
+          ) : undefined
+        }
         description={
           network.description ??
           "Device inventory and scanner status for this network."
